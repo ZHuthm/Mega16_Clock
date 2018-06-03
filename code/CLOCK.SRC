@@ -1,0 +1,7 @@
+[Files]
+main.c
+[Headers]
+clock.h
+init_devices.h
+read_key.h
+[Documents]

@@ -1,0 +1,1275 @@
+Interrupt Vectors
+    00000 940C 003A JMP	__text_start|__start
+    00012 940C 0317 JMP	_timer0_ovf_isr
+
+Program Code (text area)
+__text_start|__start:
+    0003A E5CF      LDI	R28,0x5F
+    0003B E0D4      LDI	R29,4
+    0003C BFCD      OUT	0x3D,R28
+    0003D BFDE      OUT	0x3E,R29
+    0003E 51C0      SUBI	R28,0x10
+    0003F 40D0      SBCI	R29,0
+    00040 EA0A      LDI	R16,0xAA
+    00041 8308      ST	Y,R16
+    00042 2400      CLR	R0
+    00043 E8E0      LDI	R30,0x80
+    00044 E0F0      LDI	R31,0
+    00045 E010      LDI	R17,0
+    00046 38EC      CPI	R30,0x8C
+    00047 07F1      CPC	R31,R17
+    00048 F011      BEQ	0x004B
+    00049 9201      ST	Z+,R0
+    0004A CFFB      RJMP	0x0046
+    0004B 8300      ST	Z,R16
+    0004C E5E4      LDI	R30,0x54
+    0004D E0F0      LDI	R31,0
+    0004E E6A0      LDI	R26,0x60
+    0004F E0B0      LDI	R27,0
+    00050 E010      LDI	R17,0
+    00051 E000      LDI	R16,0
+    00052 BF0B      OUT	0x3B,R16
+    00053 37E4      CPI	R30,0x74
+    00054 07F1      CPC	R31,R17
+    00055 F021      BEQ	0x005A
+    00056 95C8      LPM
+    00057 9631      ADIW	R30,1
+    00058 920D      ST	X+,R0
+    00059 CFF9      RJMP	0x0053
+    0005A 940E 0355 CALL	_main
+_exit:
+    0005C CFFF      RJMP	_exit
+FILE: C:\Users\IEUser\Documents\Clock\code\init_devices.h
+(0001) //ICC-AVR application builder : 4/18/2017 1:56:13 AM
+(0002) // Target : M16
+(0003) // Crystal: 1.0000Mhz
+(0004) 
+(0005) #include <iom16v.h>
+(0006) #include <macros.h>
+(0007) 
+(0008) void port_init(void)
+(0009) {
+(0010)  PORTA = 0x00; // common cathode
+_port_init:
+    0005D 2422      CLR	R2
+    0005E BA2B      OUT	0x1B,R2
+(0011)  DDRA  = 0xFF;
+    0005F EF8F      LDI	R24,0xFF
+    00060 BB8A      OUT	0x1A,R24
+(0012)  PORTB = 0x00;
+    00061 BA28      OUT	0x18,R2
+(0013)  DDRB  = 0x00;
+    00062 BA27      OUT	0x17,R2
+(0014)  PORTC = 0xC0; //m103 output only
+    00063 EC80      LDI	R24,0xC0
+    00064 BB85      OUT	0x15,R24
+(0015)  DDRC  = 0x3F;
+    00065 E38F      LDI	R24,0x3F
+    00066 BB84      OUT	0x14,R24
+(0016)  PORTD = 0x0C;
+    00067 E08C      LDI	R24,0xC
+    00068 BB82      OUT	0x12,R24
+(0017)  DDRD  = 0x00;
+    00069 BA21      OUT	0x11,R2
+    0006A 9508      RET
+(0018) }
+(0019) 
+(0020) /********************************
+(0021) // TIMER0 initialize - prescale:8
+(0022) // WGM: Normal
+(0023) // desired value: 1mSec
+(0024) // actual value:  1.000mSec (0.0%)
+(0025) *********************************/
+(0026) void timer0_init(void)
+(0027) {
+(0028)  TCCR0 = 0x00; 		  			  		 //stop
+_timer0_init:
+    0006B 2422      CLR	R2
+    0006C BE23      OUT	0x33,R2
+(0029)  TCNT0 = 0x83;							 //set count
+    0006D E883      LDI	R24,0x83
+    0006E BF82      OUT	0x32,R24
+(0030)  OCR0  = 0x7D;  						 //set compare
+    0006F E78D      LDI	R24,0x7D
+    00070 BF8C      OUT	0x3C,R24
+(0031)  TCCR0 = 0x02;							 //start timer
+    00071 E082      LDI	R24,2
+    00072 BF83      OUT	0x33,R24
+    00073 9508      RET
+(0032) }
+(0033) 
+(0034) //call this routine to initialize all peripherals
+(0035) void init_devices(void)
+(0036) {
+(0037)  //stop errant interrupts until set up
+(0038)  CLI(); //disable all interrupts
+_init_devices:
+    00074 94F8      BCLR	7
+(0039)  port_init();
+    00075 DFE7      RCALL	_port_init
+(0040)  timer0_init();
+    00076 DFF4      RCALL	_timer0_init
+(0041) 
+(0042)  MCUCR = 0x00;
+    00077 2422      CLR	R2
+    00078 BE25      OUT	0x35,R2
+(0043)  GICR  = 0x00;
+    00079 BE2B      OUT	0x3B,R2
+(0044)  TIMSK = 0x01; //timer interrupt sources
+    0007A E081      LDI	R24,1
+    0007B BF89      OUT	0x39,R24
+(0045)  SEI(); //re-enable interrupts
+    0007C 9478      BSET	7
+    0007D 9508      RET
+_run_time:
+    0007E 934A      ST	-Y,R20
+    0007F 935A      ST	-Y,R21
+FILE: C:\Users\IEUser\Documents\Clock\code\clock.h
+(0001) #define digit_port PORTA
+(0002) #define SEG_port PORTC
+(0003) 
+(0004) #define normal_mode   0
+(0005) #define set_mode 	  1
+(0006) 
+(0007) const unsigned char SEG_A_List[16] = { 0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,
+(0008) 0x6f,0x77,0x7c,0x39,0x5e,0x79,0x71 };//"0-F" common cathode
+(0009) 
+(0010) unsigned char time[3];// 0 seconds 1 minutes 2 hours
+(0011) unsigned char time_setter[3];
+(0012) unsigned char disp_buff[6];
+(0013) 
+(0014) unsigned int microSec = 0; // Warning INT
+(0015) 
+(0016) unsigned char pos = 0;
+(0017) unsigned char counter_5ms = 0;
+(0018) 
+(0019) unsigned char DP_flag = 0, //  0 is ON ,not 0 is OFF
+(0020) set_flag = 0;//  0 is ON ,not 0 is OFF
+(0021) 
+(0022) unsigned char keys_states = 0, // 0 run time , 1 set time
+(0023) set_states = 0;  // 0 set seconds,1 set mins, 2 set hours
+(0024) 
+(0025) 
+(0026) void run_time(void)
+(0027) {
+(0028) 	if (++microSec % 250 == 0) set_flag = ~set_flag;
+    00080 9180 0070 LDS	R24,microSec
+    00082 9190 0071 LDS	R25,microSec+1
+    00084 9601      ADIW	R24,1
+    00085 011C      MOVW	R2,R24
+    00086 9230 0071 STS	microSec+1,R3
+    00088 9220 0070 STS	microSec,R2
+    0008A EF2A      LDI	R18,0xFA
+    0008B E030      LDI	R19,0
+    0008C 018C      MOVW	R16,R24
+    0008D 940E 03EB CALL	mod16u
+    0008F 3000      CPI	R16,0
+    00090 0701      CPC	R16,R17
+    00091 F429      BNE	0x0097
+    00092 9020 0075 LDS	R2,set_flag
+    00094 9420      COM	R2
+    00095 9220 0075 STS	set_flag,R2
+(0029) 	if (microSec >= 1000) {
+    00097 9180 0070 LDS	R24,microSec
+    00099 9190 0071 LDS	R25,microSec+1
+    0009B 3E88      CPI	R24,0xE8
+    0009C E0E3      LDI	R30,3
+    0009D 079E      CPC	R25,R30
+    0009E F140      BCS	0x00C7
+(0030) 		microSec = 0;
+    0009F 2422      CLR	R2
+    000A0 2433      CLR	R3
+    000A1 9230 0071 STS	microSec+1,R3
+    000A3 9220 0070 STS	microSec,R2
+(0031) 		DP_flag = ~DP_flag;
+    000A5 9020 0074 LDS	R2,DP_flag
+    000A7 9420      COM	R2
+    000A8 9220 0074 STS	DP_flag,R2
+(0032) 		if (++time[0] >= 60) {
+    000AA 9180 0089 LDS	R24,time
+    000AC 5F8F      SUBI	R24,0xFF
+    000AD 2E28      MOV	R2,R24
+    000AE 9220 0089 STS	time,R2
+    000B0 338C      CPI	R24,0x3C
+    000B1 F0A8      BCS	0x00C7
+(0033) 			time[0] = 0;
+    000B2 2422      CLR	R2
+    000B3 9220 0089 STS	time,R2
+(0034) 			if (++time[1] >= 60) {
+    000B5 9140 008A LDS	R20,time+1
+    000B7 5F4F      SUBI	R20,0xFF
+    000B8 9340 008A STS	time+1,R20
+    000BA 334C      CPI	R20,0x3C
+    000BB F058      BCS	0x00C7
+(0035) 				time[1] = 0;
+    000BC 9220 008A STS	time+1,R2
+(0036) 				if (++time[2] >= 24) {
+    000BE 9140 008B LDS	R20,time+2
+    000C0 5F4F      SUBI	R20,0xFF
+    000C1 9340 008B STS	time+2,R20
+    000C3 3148      CPI	R20,0x18
+    000C4 F010      BCS	0x00C7
+(0037) 					time[2] = 0;
+    000C5 9220 008B STS	time+2,R2
+(0038) 				}
+(0039) 			}
+(0040) 		}
+(0041) 	}
+    000C7 9159      LD	R21,Y+
+    000C8 9149      LD	R20,Y+
+    000C9 9508      RET
+(0042) }
+(0043) 
+(0044) void Get_time(void)
+(0045) {
+(0046) 	time_setter[2] = time[2];
+_Get_time:
+    000CA 9020 008B LDS	R2,time+2
+    000CC 9220 0088 STS	time_setter+2,R2
+(0047) 	time_setter[1] = time[1];
+    000CE 9020 008A LDS	R2,time+1
+    000D0 9220 0087 STS	time_setter+1,R2
+(0048) 	time_setter[0] = time[0];
+    000D2 9020 0089 LDS	R2,time
+    000D4 9220 0086 STS	time_setter,R2
+    000D6 9508      RET
+(0049) }
+(0050) 
+(0051) void Add_time(void)
+(0052) {
+(0053)  	switch(set_states)
+_Add_time:
+    000D7 9100 0077 LDS	R16,set_states
+    000D9 2711      CLR	R17
+    000DA 3000      CPI	R16,0
+    000DB 0701      CPC	R16,R17
+    000DC F049      BEQ	0x00E6
+    000DD 3001      CPI	R16,1
+    000DE E0E0      LDI	R30,0
+    000DF 071E      CPC	R17,R30
+    000E0 F029      BEQ	0x00E6
+    000E1 3002      CPI	R16,2
+    000E2 E0E0      LDI	R30,0
+    000E3 071E      CPC	R17,R30
+    000E4 F0C1      BEQ	0x00FD
+    000E5 C02B      RJMP	0x0111
+(0054) 	{
+(0055) 	 case 0:
+(0056) 	 case 1:
+(0057) 	 	  if(++time_setter[set_states]>=60)time_setter[set_states]=0;break;
+    000E6 E886      LDI	R24,0x86
+    000E7 E090      LDI	R25,0
+    000E8 9020 0077 LDS	R2,set_states
+    000EA 2433      CLR	R3
+    000EB 0E28      ADD	R2,R24
+    000EC 1E39      ADC	R3,R25
+    000ED 01F1      MOVW	R30,R2
+    000EE 8180      LD	R24,Z
+    000EF 5F8F      SUBI	R24,0xFF
+    000F0 8380      ST	Z,R24
+    000F1 338C      CPI	R24,0x3C
+    000F2 F0F0      BCS	0x0111
+    000F3 E886      LDI	R24,0x86
+    000F4 E090      LDI	R25,0
+    000F5 91E0 0077 LDS	R30,set_states
+    000F7 27FF      CLR	R31
+    000F8 0FE8      ADD	R30,R24
+    000F9 1FF9      ADC	R31,R25
+    000FA 2422      CLR	R2
+    000FB 8220      ST	Z,R2
+    000FC C014      RJMP	0x0111
+(0058) 	 case 2:
+(0059) 	 	  if(++time_setter[set_states]>=24)time_setter[set_states]=0;break;
+    000FD E886      LDI	R24,0x86
+    000FE E090      LDI	R25,0
+    000FF 9120 0077 LDS	R18,set_states
+    00101 2733      CLR	R19
+    00102 0F28      ADD	R18,R24
+    00103 1F39      ADC	R19,R25
+    00104 01F9      MOVW	R30,R18
+    00105 8100      LD	R16,Z
+    00106 5F0F      SUBI	R16,0xFF
+    00107 8300      ST	Z,R16
+    00108 3108      CPI	R16,0x18
+    00109 F038      BCS	0x0111
+    0010A 91E0 0077 LDS	R30,set_states
+    0010C 27FF      CLR	R31
+    0010D 0FE8      ADD	R30,R24
+    0010E 1FF9      ADC	R31,R25
+    0010F 2422      CLR	R2
+    00110 8220      ST	Z,R2
+    00111 9508      RET
+(0060) 	}
+(0061) 	
+(0062) }
+(0063) 
+(0064) void Sub_time(void)
+(0065) {
+(0066)  	switch(set_states)
+_Sub_time:
+    00112 9100 0077 LDS	R16,set_states
+    00114 2711      CLR	R17
+    00115 3000      CPI	R16,0
+    00116 0701      CPC	R16,R17
+    00117 F049      BEQ	0x0121
+    00118 3001      CPI	R16,1
+    00119 E0E0      LDI	R30,0
+    0011A 071E      CPC	R17,R30
+    0011B F029      BEQ	0x0121
+    0011C 3002      CPI	R16,2
+    0011D E0E0      LDI	R30,0
+    0011E 071E      CPC	R17,R30
+    0011F F0C9      BEQ	0x0139
+    00120 C02C      RJMP	0x014D
+(0067) 	{
+(0068) 	 case 0:
+(0069) 	 case 1:
+(0070) 	 	  if(--time_setter[set_states] == 255)time_setter[set_states]=59;break;
+    00121 E886      LDI	R24,0x86
+    00122 E090      LDI	R25,0
+    00123 9020 0077 LDS	R2,set_states
+    00125 2433      CLR	R3
+    00126 0E28      ADD	R2,R24
+    00127 1E39      ADC	R3,R25
+    00128 01F1      MOVW	R30,R2
+    00129 8180      LD	R24,Z
+    0012A 5081      SUBI	R24,1
+    0012B 2E48      MOV	R4,R24
+    0012C 8240      ST	Z,R4
+    0012D 3F8F      CPI	R24,0xFF
+    0012E F4F1      BNE	0x014D
+    0012F E886      LDI	R24,0x86
+    00130 E090      LDI	R25,0
+    00131 91E0 0077 LDS	R30,set_states
+    00133 27FF      CLR	R31
+    00134 0FE8      ADD	R30,R24
+    00135 1FF9      ADC	R31,R25
+    00136 E38B      LDI	R24,0x3B
+    00137 8380      ST	Z,R24
+    00138 C014      RJMP	0x014D
+(0071) 	 case 2:
+(0072) 	 	  if(--time_setter[set_states] == 255)time_setter[set_states]=23;break;
+    00139 E886      LDI	R24,0x86
+    0013A E090      LDI	R25,0
+    0013B 9120 0077 LDS	R18,set_states
+    0013D 2733      CLR	R19
+    0013E 0F28      ADD	R18,R24
+    0013F 1F39      ADC	R19,R25
+    00140 01F9      MOVW	R30,R18
+    00141 8100      LD	R16,Z
+    00142 5001      SUBI	R16,1
+    00143 8300      ST	Z,R16
+    00144 3F0F      CPI	R16,0xFF
+    00145 F439      BNE	0x014D
+    00146 91E0 0077 LDS	R30,set_states
+    00148 27FF      CLR	R31
+    00149 0FE8      ADD	R30,R24
+    0014A 1FF9      ADC	R31,R25
+    0014B E187      LDI	R24,0x17
+    0014C 8380      ST	Z,R24
+    0014D 9508      RET
+(0073) 	}
+(0074) }
+(0075) 
+(0076) void quick_Sub_time(void)
+(0077) {
+(0078)    switch(set_states)
+_quick_Sub_time:
+    0014E 9100 0077 LDS	R16,set_states
+    00150 2711      CLR	R17
+    00151 3000      CPI	R16,0
+    00152 0701      CPC	R16,R17
+    00153 F049      BEQ	0x015D
+    00154 3001      CPI	R16,1
+    00155 E0E0      LDI	R30,0
+    00156 071E      CPC	R17,R30
+    00157 F029      BEQ	0x015D
+    00158 3002      CPI	R16,2
+    00159 E0E0      LDI	R30,0
+    0015A 071E      CPC	R17,R30
+    0015B F119      BEQ	0x017F
+    0015C C042      RJMP	0x019F
+(0079) 	{
+(0080) 	 case 0:
+(0081) 	 case 1:
+(0082) 	 	  time_setter[set_states] -=10;
+    0015D E886      LDI	R24,0x86
+    0015E E090      LDI	R25,0
+    0015F 9020 0077 LDS	R2,set_states
+    00161 2433      CLR	R3
+    00162 0E28      ADD	R2,R24
+    00163 1E39      ADC	R3,R25
+    00164 01F1      MOVW	R30,R2
+    00165 8180      LD	R24,Z
+    00166 508A      SUBI	R24,0xA
+    00167 8380      ST	Z,R24
+(0083) 	 	  if(time_setter[set_states] >= 245)time_setter[set_states]-=196;break;
+    00168 E886      LDI	R24,0x86
+    00169 E090      LDI	R25,0
+    0016A 91E0 0077 LDS	R30,set_states
+    0016C 27FF      CLR	R31
+    0016D 0FE8      ADD	R30,R24
+    0016E 1FF9      ADC	R31,R25
+    0016F 8180      LD	R24,Z
+    00170 3F85      CPI	R24,0xF5
+    00171 F408      BCC	0x0173
+    00172 C02C      RJMP	0x019F
+    00173 E886      LDI	R24,0x86
+    00174 E090      LDI	R25,0
+    00175 9020 0077 LDS	R2,set_states
+    00177 2433      CLR	R3
+    00178 0E28      ADD	R2,R24
+    00179 1E39      ADC	R3,R25
+    0017A 01F1      MOVW	R30,R2
+    0017B 8180      LD	R24,Z
+    0017C 5C84      SUBI	R24,0xC4
+    0017D 8380      ST	Z,R24
+    0017E C020      RJMP	0x019F
+(0084) 	 case 2:
+(0085) 	 	  time_setter[set_states] -=3;
+    0017F E886      LDI	R24,0x86
+    00180 E090      LDI	R25,0
+    00181 9100 0077 LDS	R16,set_states
+    00183 2711      CLR	R17
+    00184 0F08      ADD	R16,R24
+    00185 1F19      ADC	R17,R25
+    00186 01F8      MOVW	R30,R16
+    00187 8180      LD	R24,Z
+    00188 5083      SUBI	R24,3
+    00189 8380      ST	Z,R24
+(0086) 	 	  if(time_setter[set_states] >= 252)time_setter[set_states]-=232;break;
+    0018A E886      LDI	R24,0x86
+    0018B E090      LDI	R25,0
+    0018C 91E0 0077 LDS	R30,set_states
+    0018E 27FF      CLR	R31
+    0018F 0FE8      ADD	R30,R24
+    00190 1FF9      ADC	R31,R25
+    00191 8180      LD	R24,Z
+    00192 3F8C      CPI	R24,0xFC
+    00193 F058      BCS	0x019F
+    00194 E886      LDI	R24,0x86
+    00195 E090      LDI	R25,0
+    00196 9100 0077 LDS	R16,set_states
+    00198 2711      CLR	R17
+    00199 0F08      ADD	R16,R24
+    0019A 1F19      ADC	R17,R25
+    0019B 01F8      MOVW	R30,R16
+    0019C 8180      LD	R24,Z
+    0019D 5E88      SUBI	R24,0xE8
+    0019E 8380      ST	Z,R24
+    0019F 9508      RET
+(0087) 	}
+(0088) }
+(0089) 
+(0090) void Set_time(void)
+(0091) {
+(0092) 	time[2] = time_setter[2];
+_Set_time:
+    001A0 9020 0088 LDS	R2,time_setter+2
+    001A2 9220 008B STS	time+2,R2
+(0093) 	time[1] = time_setter[1];
+    001A4 9020 0087 LDS	R2,time_setter+1
+    001A6 9220 008A STS	time+1,R2
+(0094) 	time[0] = time_setter[0];
+    001A8 9020 0086 LDS	R2,time_setter
+    001AA 9220 0089 STS	time,R2
+    001AC 9508      RET
+_time_to_dispbuff:
+  j                    --> R20
+  i                    --> R10
+    001AD 940E 041F CALL	push_xgset300C
+(0095) }
+(0096) 
+(0097) 
+(0098) void time_to_dispbuff(void)
+(0099) {
+(0100) 	unsigned char i = 0, j = 0;
+    001AF 2744      CLR	R20
+(0101) 	for (i = 0; i <= 2; i++)
+    001B0 24AA      CLR	R10
+    001B1 C029      RJMP	0x01DB
+(0102) 	{
+(0103) 		disp_buff[j++] = time[i] % 10;
+    001B2 2E24      MOV	R2,R20
+    001B3 2433      CLR	R3
+    001B4 5F4F      SUBI	R20,0xFF
+    001B5 E889      LDI	R24,0x89
+    001B6 E090      LDI	R25,0
+    001B7 2DEA      MOV	R30,R10
+    001B8 27FF      CLR	R31
+    001B9 0FE8      ADD	R30,R24
+    001BA 1FF9      ADC	R31,R25
+    001BB 8100      LD	R16,Z
+    001BC E01A      LDI	R17,0xA
+    001BD 940E 0407 CALL	mod8u
+    001BF E880      LDI	R24,0x80
+    001C0 E090      LDI	R25,0
+    001C1 2DE2      MOV	R30,R2
+    001C2 27FF      CLR	R31
+    001C3 0FE8      ADD	R30,R24
+    001C4 1FF9      ADC	R31,R25
+    001C5 8300      ST	Z,R16
+(0104) 		disp_buff[j++] = time[i] / 10;
+    001C6 2E24      MOV	R2,R20
+    001C7 2433      CLR	R3
+    001C8 5F4F      SUBI	R20,0xFF
+    001C9 E889      LDI	R24,0x89
+    001CA E090      LDI	R25,0
+    001CB 2DEA      MOV	R30,R10
+    001CC 27FF      CLR	R31
+    001CD 0FE8      ADD	R30,R24
+    001CE 1FF9      ADC	R31,R25
+    001CF 8100      LD	R16,Z
+    001D0 E01A      LDI	R17,0xA
+    001D1 940E 0409 CALL	div8u
+    001D3 E880      LDI	R24,0x80
+    001D4 E090      LDI	R25,0
+    001D5 2DE2      MOV	R30,R2
+    001D6 27FF      CLR	R31
+    001D7 0FE8      ADD	R30,R24
+    001D8 1FF9      ADC	R31,R25
+    001D9 8300      ST	Z,R16
+    001DA 94A3      INC	R10
+    001DB E082      LDI	R24,2
+    001DC 158A      CP	R24,R10
+    001DD F6A0      BCC	0x01B2
+    001DE 940C 0424 JMP	pop_xgset300C
+_setTime_to_dispbuff:
+  j                    --> R20
+  i                    --> R10
+    001E0 940E 041F CALL	push_xgset300C
+(0105) 	}
+(0106) }
+(0107) 
+(0108) void setTime_to_dispbuff(void)
+(0109) {
+(0110) 	unsigned char i = 0, j = 0;
+    001E2 2744      CLR	R20
+(0111) 	for (i = 0; i <= 2; i++)
+    001E3 24AA      CLR	R10
+    001E4 C029      RJMP	0x020E
+(0112) 	{
+(0113) 		disp_buff[j++] = time_setter[i] % 10;
+    001E5 2E24      MOV	R2,R20
+    001E6 2433      CLR	R3
+    001E7 5F4F      SUBI	R20,0xFF
+    001E8 E886      LDI	R24,0x86
+    001E9 E090      LDI	R25,0
+    001EA 2DEA      MOV	R30,R10
+    001EB 27FF      CLR	R31
+    001EC 0FE8      ADD	R30,R24
+    001ED 1FF9      ADC	R31,R25
+    001EE 8100      LD	R16,Z
+    001EF E01A      LDI	R17,0xA
+    001F0 940E 0407 CALL	mod8u
+    001F2 E880      LDI	R24,0x80
+    001F3 E090      LDI	R25,0
+    001F4 2DE2      MOV	R30,R2
+    001F5 27FF      CLR	R31
+    001F6 0FE8      ADD	R30,R24
+    001F7 1FF9      ADC	R31,R25
+    001F8 8300      ST	Z,R16
+(0114) 		disp_buff[j++] = time_setter[i] / 10;
+    001F9 2E24      MOV	R2,R20
+    001FA 2433      CLR	R3
+    001FB 5F4F      SUBI	R20,0xFF
+    001FC E886      LDI	R24,0x86
+    001FD E090      LDI	R25,0
+    001FE 2DEA      MOV	R30,R10
+    001FF 27FF      CLR	R31
+    00200 0FE8      ADD	R30,R24
+    00201 1FF9      ADC	R31,R25
+    00202 8100      LD	R16,Z
+    00203 E01A      LDI	R17,0xA
+    00204 940E 0409 CALL	div8u
+    00206 E880      LDI	R24,0x80
+    00207 E090      LDI	R25,0
+    00208 2DE2      MOV	R30,R2
+    00209 27FF      CLR	R31
+    0020A 0FE8      ADD	R30,R24
+    0020B 1FF9      ADC	R31,R25
+    0020C 8300      ST	Z,R16
+    0020D 94A3      INC	R10
+    0020E E082      LDI	R24,2
+    0020F 158A      CP	R24,R10
+    00210 F6A0      BCC	0x01E5
+    00211 940C 0424 JMP	pop_xgset300C
+_Disp_time_1_digit:
+  states               --> R10
+    00213 92AA      ST	-Y,R10
+    00214 2EA0      MOV	R10,R16
+(0115) 	}
+(0116) }
+(0117) 
+(0118) void Disp_time_1_digit(unsigned char states)
+(0119) {
+(0120) 	SEG_port |= 0x3f; // XX11 1111 HIGH OFF LOW ON 
+    00215 B385      IN	R24,0x15
+    00216 638F      ORI	R24,0x3F
+    00217 BB85      OUT	0x15,R24
+(0121) 	if (states == 0) return;
+    00218 20AA      TST	R10
+    00219 F409      BNE	0x021B
+    0021A C025      RJMP	0x0240
+(0122) 	digit_port = SEG_A_List[disp_buff[pos]];
+    0021B E880      LDI	R24,0x80
+    0021C E090      LDI	R25,0
+    0021D 91E0 0072 LDS	R30,pos
+    0021F 27FF      CLR	R31
+    00220 0FE8      ADD	R30,R24
+    00221 1FF9      ADC	R31,R25
+    00222 81E0      LD	R30,Z
+    00223 27FF      CLR	R31
+    00224 E680      LDI	R24,0x60
+    00225 E090      LDI	R25,0
+    00226 0FE8      ADD	R30,R24
+    00227 1FF9      ADC	R31,R25
+    00228 8020      LD	R2,Z
+    00229 BA2B      OUT	0x1B,R2
+(0123) 	if (!DP_flag && (pos == 2 || pos == 4)) digit_port |= 0x80;
+    0022A 9020 0074 LDS	R2,DP_flag
+    0022C 2022      TST	R2
+    0022D F441      BNE	0x0236
+    0022E 9020 0072 LDS	R2,pos
+    00230 2D82      MOV	R24,R2
+    00231 3082      CPI	R24,2
+    00232 F011      BEQ	0x0235
+    00233 3084      CPI	R24,4
+    00234 F409      BNE	0x0236
+    00235 9ADF      SBI	0x1B,7
+(0124) 	SEG_port &= ~(1 << pos); // open the SEG which subscript is 'pos'
+    00236 9110 0072 LDS	R17,pos
+    00238 E001      LDI	R16,1
+    00239 940E 0437 CALL	lsl8
+    0023B 2E20      MOV	R2,R16
+    0023C 9420      COM	R2
+    0023D B235      IN	R3,0x15
+    0023E 2032      AND	R3,R2
+    0023F BA35      OUT	0x15,R3
+    00240 90A9      LD	R10,Y+
+    00241 9508      RET
+(0125) }
+(0126) 
+(0127) 
+(0128) void Disp_realTime(void)
+(0129) {
+(0130) 	time_to_dispbuff();
+_Disp_realTime:
+    00242 DF6A      RCALL	_time_to_dispbuff
+(0131) 	Disp_time_1_digit(1);
+    00243 E001      LDI	R16,1
+    00244 DFCE      RCALL	_Disp_time_1_digit
+(0132) 	if (++pos >= 6) pos = 0;
+    00245 9180 0072 LDS	R24,pos
+    00247 5F8F      SUBI	R24,0xFF
+    00248 2E28      MOV	R2,R24
+    00249 9220 0072 STS	pos,R2
+    0024B 3086      CPI	R24,6
+    0024C F018      BCS	0x0250
+    0024D 2422      CLR	R2
+    0024E 9220 0072 STS	pos,R2
+    00250 9508      RET
+_Disp_setTime:
+    00251 934A      ST	-Y,R20
+    00252 935A      ST	-Y,R21
+(0133) }
+(0134) 
+(0135) void Disp_setTime(void)
+(0136) {
+(0137) 	setTime_to_dispbuff();
+    00253 DF8C      RCALL	_setTime_to_dispbuff
+(0138) 	if ((set_states == 0 && (pos == 0 || pos == 1))
+    00254 9020 0077 LDS	R2,set_states
+    00256 2022      TST	R2
+    00257 F439      BNE	0x025F
+    00258 9020 0072 LDS	R2,pos
+    0025A 2022      TST	R2
+    0025B F0C1      BEQ	0x0274
+    0025C 2D82      MOV	R24,R2
+    0025D 3081      CPI	R24,1
+    0025E F0A9      BEQ	0x0274
+    0025F 9180 0077 LDS	R24,set_states
+    00261 3081      CPI	R24,1
+    00262 F439      BNE	0x026A
+    00263 9020 0072 LDS	R2,pos
+    00265 2D82      MOV	R24,R2
+    00266 3082      CPI	R24,2
+    00267 F061      BEQ	0x0274
+    00268 3083      CPI	R24,3
+    00269 F051      BEQ	0x0274
+    0026A 9180 0077 LDS	R24,set_states
+    0026C 3082      CPI	R24,2
+    0026D F451      BNE	0x0278
+    0026E 9140 0072 LDS	R20,pos
+    00270 3044      CPI	R20,4
+    00271 F011      BEQ	0x0274
+    00272 3045      CPI	R20,5
+    00273 F421      BNE	0x0278
+(0139) 		|| (set_states == 1 && (pos == 2 || pos == 3))
+(0140) 		|| (set_states == 2 && (pos == 4 || pos == 5)))
+(0141) 		Disp_time_1_digit(set_flag);
+    00274 9100 0075 LDS	R16,set_flag
+    00276 DF9C      RCALL	_Disp_time_1_digit
+    00277 C002      RJMP	0x027A
+(0142) 	else
+(0143) 		Disp_time_1_digit(1);
+    00278 E001      LDI	R16,1
+    00279 DF99      RCALL	_Disp_time_1_digit
+(0144) 	if (++pos >= 6) pos = 0;
+    0027A 9140 0072 LDS	R20,pos
+    0027C 5F4F      SUBI	R20,0xFF
+    0027D 9340 0072 STS	pos,R20
+    0027F 3046      CPI	R20,6
+    00280 F018      BCS	0x0284
+    00281 2422      CLR	R2
+    00282 9220 0072 STS	pos,R2
+    00284 9159      LD	R21,Y+
+    00285 9149      LD	R20,Y+
+    00286 9508      RET
+_read_key_n:
+  key_return           --> R20
+  i                    --> R10
+    00287 940E 0429 CALL	push_xgsetF00C
+    00289 2EA0      MOV	R10,R16
+FILE: C:\Users\IEUser\Documents\Clock\code\read_key.h
+(0001) #define key_is_pressed() (0==(PINC&(1<<i)))
+(0002) #define key_state_0	    0
+(0003) #define key_state_1 	1
+(0004) #define key_state_2 	2
+(0005) #define key_state_3 	3
+(0006) 
+(0007) unsigned char key_stime_counter = 0;
+(0008) unsigned char key_stime_ok = 0;
+(0009) 
+(0010) /************************************
+(0011) // return 0 means no action
+(0012) // return 1 means one time press key
+(0013) // return 2 means long press key
+(0014) ************************************/
+(0015) unsigned char read_key_n(unsigned char i)
+(0016) {
+(0017) 	static unsigned char key_state[2] = {0}, key_time = 0;
+(0018) 	unsigned char key_return = 0;
+    0028A 2744      CLR	R20
+(0019) 	switch (key_state[i-6])
+    0028B E784      LDI	R24,0x74
+    0028C E090      LDI	R25,0
+    0028D 2DEA      MOV	R30,R10
+    0028E 27FF      CLR	R31
+    0028F 0FE8      ADD	R30,R24
+    00290 1FF9      ADC	R31,R25
+    00291 8160      LD	R22,Z
+    00292 2777      CLR	R23
+    00293 3060      CPI	R22,0
+    00294 0767      CPC	R22,R23
+    00295 F079      BEQ	0x02A5
+    00296 3061      CPI	R22,1
+    00297 E0E0      LDI	R30,0
+    00298 077E      CPC	R23,R30
+    00299 F0E1      BEQ	0x02B6
+    0029A 3062      CPI	R22,2
+    0029B E0E0      LDI	R30,0
+    0029C 077E      CPC	R23,R30
+    0029D F409      BNE	0x029F
+    0029E C033      RJMP	0x02D2
+    0029F 3063      CPI	R22,3
+    002A0 E0E0      LDI	R30,0
+    002A1 077E      CPC	R23,R30
+    002A2 F409      BNE	0x02A4
+    002A3 C054      RJMP	0x02F8
+    002A4 C06F      RJMP	0x0314
+(0020) 	{
+(0021) 	case key_state_0:
+(0022) 		if (key_is_pressed()) key_state[i-6] = key_state_1;
+    002A5 E001      LDI	R16,1
+    002A6 2D1A      MOV	R17,R10
+    002A7 940E 0437 CALL	lsl8
+    002A9 B223      IN	R2,0x13
+    002AA 2220      AND	R2,R16
+    002AB F009      BEQ	0x02AD
+    002AC C067      RJMP	0x0314
+    002AD E784      LDI	R24,0x74
+    002AE E090      LDI	R25,0
+    002AF 2DEA      MOV	R30,R10
+    002B0 27FF      CLR	R31
+    002B1 0FE8      ADD	R30,R24
+    002B2 1FF9      ADC	R31,R25
+    002B3 E081      LDI	R24,1
+    002B4 8380      ST	Z,R24
+(0023) 		break;
+    002B5 C05E      RJMP	0x0314
+(0024) 
+(0025) 	case key_state_1:
+(0026) 		if (key_is_pressed())
+    002B6 E001      LDI	R16,1
+    002B7 2D1A      MOV	R17,R10
+    002B8 940E 0437 CALL	lsl8
+    002BA B223      IN	R2,0x13
+    002BB 2220      AND	R2,R16
+    002BC F461      BNE	0x02C9
+(0027) 		{
+(0028) 			key_state[i-6] = key_state_2;
+    002BD E784      LDI	R24,0x74
+    002BE E090      LDI	R25,0
+    002BF 2DEA      MOV	R30,R10
+    002C0 27FF      CLR	R31
+    002C1 0FE8      ADD	R30,R24
+    002C2 1FF9      ADC	R31,R25
+    002C3 E082      LDI	R24,2
+    002C4 8380      ST	Z,R24
+(0029) 			key_time = 0;
+    002C5 2422      CLR	R2
+    002C6 9220 007C STS	read_key.h:key_time,R2
+(0030) 		}
+    002C8 C04B      RJMP	0x0314
+(0031) 		else key_state[i-6] = key_state_0;
+    002C9 E784      LDI	R24,0x74
+    002CA E090      LDI	R25,0
+    002CB 2DEA      MOV	R30,R10
+    002CC 27FF      CLR	R31
+    002CD 0FE8      ADD	R30,R24
+    002CE 1FF9      ADC	R31,R25
+    002CF 2422      CLR	R2
+    002D0 8220      ST	Z,R2
+(0032) 		break;
+    002D1 C042      RJMP	0x0314
+(0033) 
+(0034) 	case key_state_2:
+(0035) 		if (!key_is_pressed())
+    002D2 E001      LDI	R16,1
+    002D3 2D1A      MOV	R17,R10
+    002D4 940E 0437 CALL	lsl8
+    002D6 B223      IN	R2,0x13
+    002D7 2220      AND	R2,R16
+    002D8 F051      BEQ	0x02E3
+(0036) 		{
+(0037) 			key_state[i-6] = key_state_0;
+    002D9 E784      LDI	R24,0x74
+    002DA E090      LDI	R25,0
+    002DB 2DEA      MOV	R30,R10
+    002DC 27FF      CLR	R31
+    002DD 0FE8      ADD	R30,R24
+    002DE 1FF9      ADC	R31,R25
+    002DF 2422      CLR	R2
+    002E0 8220      ST	Z,R2
+(0038) 			key_return = 1;
+    002E1 E041      LDI	R20,1
+(0039) 		}
+    002E2 C031      RJMP	0x0314
+(0040) 		else if (++key_time >= 100)
+    002E3 9180 007C LDS	R24,read_key.h:key_time
+    002E5 5F8F      SUBI	R24,0xFF
+    002E6 2E28      MOV	R2,R24
+    002E7 9220 007C STS	read_key.h:key_time,R2
+    002E9 3684      CPI	R24,0x64
+    002EA F148      BCS	0x0314
+(0041) 		{
+(0042) 			key_state[i-6] = key_state_3;
+    002EB E784      LDI	R24,0x74
+    002EC E090      LDI	R25,0
+    002ED 2DEA      MOV	R30,R10
+    002EE 27FF      CLR	R31
+    002EF 0FE8      ADD	R30,R24
+    002F0 1FF9      ADC	R31,R25
+    002F1 E083      LDI	R24,3
+    002F2 8380      ST	Z,R24
+(0043) 			key_time = 0;
+    002F3 2422      CLR	R2
+    002F4 9220 007C STS	read_key.h:key_time,R2
+(0044) 			key_return = 2;
+    002F6 E042      LDI	R20,2
+(0045) 		}
+(0046) 		break;
+    002F7 C01C      RJMP	0x0314
+(0047) 
+(0048) 	case key_state_3:
+(0049) 		if (!key_is_pressed()) key_state[i-6] = key_state_0;
+    002F8 E001      LDI	R16,1
+    002F9 2D1A      MOV	R17,R10
+    002FA 940E 0437 CALL	lsl8
+    002FC B223      IN	R2,0x13
+    002FD 2220      AND	R2,R16
+    002FE F049      BEQ	0x0308
+    002FF E784      LDI	R24,0x74
+    00300 E090      LDI	R25,0
+    00301 2DEA      MOV	R30,R10
+    00302 27FF      CLR	R31
+    00303 0FE8      ADD	R30,R24
+    00304 1FF9      ADC	R31,R25
+    00305 2422      CLR	R2
+    00306 8220      ST	Z,R2
+    00307 C00C      RJMP	0x0314
+(0050) 		else
+(0051) 		{
+(0052) 			if (++key_time >= 50)
+    00308 9180 007C LDS	R24,read_key.h:key_time
+    0030A 5F8F      SUBI	R24,0xFF
+    0030B 2E28      MOV	R2,R24
+    0030C 9220 007C STS	read_key.h:key_time,R2
+    0030E 3382      CPI	R24,0x32
+    0030F F020      BCS	0x0314
+(0053) 			{
+(0054) 				key_time = 0;
+    00310 2422      CLR	R2
+    00311 9220 007C STS	read_key.h:key_time,R2
+(0055) 				key_return = 2;
+    00313 E042      LDI	R20,2
+(0056) 			}
+(0057) 		}
+(0058) 		break;
+(0059) 	}
+(0060) 	return key_return;
+    00314 2F04      MOV	R16,R20
+    00315 940C 0430 JMP	pop_xgsetF00C
+_timer0_ovf_isr:
+    00317 920A      ST	-Y,R0
+    00318 921A      ST	-Y,R1
+    00319 922A      ST	-Y,R2
+    0031A 923A      ST	-Y,R3
+    0031B 924A      ST	-Y,R4
+    0031C 925A      ST	-Y,R5
+    0031D 926A      ST	-Y,R6
+    0031E 927A      ST	-Y,R7
+    0031F 928A      ST	-Y,R8
+    00320 929A      ST	-Y,R9
+    00321 930A      ST	-Y,R16
+    00322 931A      ST	-Y,R17
+    00323 932A      ST	-Y,R18
+    00324 933A      ST	-Y,R19
+    00325 938A      ST	-Y,R24
+    00326 939A      ST	-Y,R25
+    00327 93AA      ST	-Y,R26
+    00328 93BA      ST	-Y,R27
+    00329 93EA      ST	-Y,R30
+    0032A 93FA      ST	-Y,R31
+    0032B B60F      IN	R0,0x3F
+    0032C 920A      ST	-Y,R0
+FILE: C:\Users\IEUser\Documents\Clock\code\main.c
+(0001) #include "init_devices.h"
+(0002) #include "clock.h"
+(0003) #include "read_key.h"
+(0004) 
+(0005) #pragma interrupt_handler timer0_ovf_isr:iv_TIM0_OVF
+(0006) void timer0_ovf_isr(void)
+(0007) {
+(0008) 	TCNT0 = 0x83; //reload counter value
+    0032D E883      LDI	R24,0x83
+    0032E BF82      OUT	0x32,R24
+(0009) 
+(0010) 	run_time();
+    0032F DD4E      RCALL	_run_time
+(0011) 
+(0012) 	if (++key_stime_counter >= 10)
+    00330 9180 0078 LDS	R24,key_stime_counter
+    00332 5F8F      SUBI	R24,0xFF
+    00333 2E28      MOV	R2,R24
+    00334 9220 0078 STS	key_stime_counter,R2
+    00336 308A      CPI	R24,0xA
+    00337 F030      BCS	0x033E
+(0013) 	{
+(0014) 		key_stime_counter = 0;
+    00338 2422      CLR	R2
+    00339 9220 0078 STS	key_stime_counter,R2
+(0015) 		key_stime_ok = 1;
+    0033B E081      LDI	R24,1
+    0033C 9380 0079 STS	key_stime_ok,R24
+(0016) 	}
+    0033E 9009      LD	R0,Y+
+    0033F BE0F      OUT	0x3F,R0
+    00340 91F9      LD	R31,Y+
+    00341 91E9      LD	R30,Y+
+    00342 91B9      LD	R27,Y+
+    00343 91A9      LD	R26,Y+
+    00344 9199      LD	R25,Y+
+    00345 9189      LD	R24,Y+
+    00346 9139      LD	R19,Y+
+    00347 9129      LD	R18,Y+
+    00348 9119      LD	R17,Y+
+    00349 9109      LD	R16,Y+
+    0034A 9099      LD	R9,Y+
+    0034B 9089      LD	R8,Y+
+    0034C 9079      LD	R7,Y+
+    0034D 9069      LD	R6,Y+
+    0034E 9059      LD	R5,Y+
+    0034F 9049      LD	R4,Y+
+    00350 9039      LD	R3,Y+
+    00351 9029      LD	R2,Y+
+    00352 9019      LD	R1,Y+
+    00353 9009      LD	R0,Y+
+    00354 9518      RETI
+(0017) 
+(0018) }
+(0019) 
+(0020) void main(void)
+(0021) {
+(0022) 	static unsigned char key1_holdTime = 0;
+(0023) 	static unsigned int no_action_time = 0;
+(0024) 	init_devices();
+_main:
+    00355 DD1E      RCALL	_init_devices
+    00356 C092      RJMP	0x03E9
+(0025) 	//insert your functional code here...
+(0026) 	while (1)
+(0027) 	{
+(0028) 
+(0029) 		switch (keys_states)
+    00357 9140 0076 LDS	R20,keys_states
+    00359 2755      CLR	R21
+    0035A 3040      CPI	R20,0
+    0035B 0745      CPC	R20,R21
+    0035C F029      BEQ	0x0362
+    0035D 3041      CPI	R20,1
+    0035E E0E0      LDI	R30,0
+    0035F 075E      CPC	R21,R30
+    00360 F019      BEQ	0x0364
+    00361 C003      RJMP	0x0365
+(0030) 		{
+(0031) 		case normal_mode :Disp_realTime(); break;
+    00362 DEDF      RCALL	_Disp_realTime
+    00363 C001      RJMP	0x0365
+(0032) 		case set_mode :Disp_setTime(); break;
+    00364 DEEC      RCALL	_Disp_setTime
+(0033) 		default:break;
+(0034) 		}
+(0035) 
+(0036) 		if (key_stime_ok)// 10ms watch key one time 
+    00365 9020 0079 LDS	R2,key_stime_ok
+    00367 2022      TST	R2
+    00368 F409      BNE	0x036A
+    00369 C07F      RJMP	0x03E9
+(0037) 		{
+(0038) 			key_stime_ok = 0;
+    0036A 2422      CLR	R2
+    0036B 9220 0079 STS	key_stime_ok,R2
+(0039) 
+(0040) 			switch (read_key_n(7))
+    0036D E007      LDI	R16,7
+    0036E DF18      RCALL	_read_key_n
+    0036F 2F40      MOV	R20,R16
+    00370 2755      CLR	R21
+    00371 3040      CPI	R20,0
+    00372 0745      CPC	R20,R21
+    00373 F049      BEQ	0x037D
+    00374 3041      CPI	R20,1
+    00375 E0E0      LDI	R30,0
+    00376 075E      CPC	R21,R30
+    00377 F0F9      BEQ	0x0397
+    00378 3042      CPI	R20,2
+    00379 E0E0      LDI	R30,0
+    0037A 075E      CPC	R21,R30
+    0037B F139      BEQ	0x03A3
+    0037C C04B      RJMP	0x03C8
+(0041) 			{
+(0042) 			case 0:
+(0043) 				 if(++no_action_time>=1000) no_action_time=keys_states = set_states = 0;
+    0037D 9180 007E LDS	R24,main.c:no_action_time
+    0037F 9190 007F LDS	R25,main.c:no_action_time+1
+    00381 9601      ADIW	R24,1
+    00382 011C      MOVW	R2,R24
+    00383 9230 007F STS	main.c:no_action_time+1,R3
+    00385 9220 007E STS	main.c:no_action_time,R2
+    00387 3E88      CPI	R24,0xE8
+    00388 E0E3      LDI	R30,3
+    00389 079E      CPC	R25,R30
+    0038A F408      BCC	0x038C
+    0038B C03C      RJMP	0x03C8
+    0038C 2422      CLR	R2
+    0038D 9220 0077 STS	set_states,R2
+    0038F 9220 0076 STS	keys_states,R2
+    00391 2433      CLR	R3
+    00392 9230 007F STS	main.c:no_action_time+1,R3
+    00394 9220 007E STS	main.c:no_action_time,R2
+(0044) 				 break;
+    00396 C031      RJMP	0x03C8
+(0045) 			case 1:
+(0046) 				 no_action_time=0;
+    00397 2422      CLR	R2
+    00398 2433      CLR	R3
+    00399 9230 007F STS	main.c:no_action_time+1,R3
+    0039B 9220 007E STS	main.c:no_action_time,R2
+(0047) 				 if(keys_states==1)
+    0039D 9180 0076 LDS	R24,keys_states
+    0039F 3081      CPI	R24,1
+    003A0 F539      BNE	0x03C8
+(0048) 				 	Add_time();
+    003A1 DD35      RCALL	_Add_time
+(0049) 				
+(0050) 				break;
+    003A2 C025      RJMP	0x03C8
+(0051) 			case 2:
+(0052) 				 no_action_time=0;
+    003A3 2422      CLR	R2
+    003A4 2433      CLR	R3
+    003A5 9230 007F STS	main.c:no_action_time+1,R3
+    003A7 9220 007E STS	main.c:no_action_time,R2
+(0053) 				 if (++key1_holdTime >= 2) {
+    003A9 9140 007D LDS	R20,main.c:key1_holdTime
+    003AB 5F4F      SUBI	R20,0xFF
+    003AC 9340 007D STS	main.c:key1_holdTime,R20
+    003AE 3042      CPI	R20,2
+    003AF F0C0      BCS	0x03C8
+(0054) 					key1_holdTime = 0;
+    003B0 9220 007D STS	main.c:key1_holdTime,R2
+(0055) 					if (keys_states == normal_mode )
+    003B2 9020 0076 LDS	R2,keys_states
+    003B4 2022      TST	R2
+    003B5 F429      BNE	0x03BB
+(0056) 					{
+(0057) 						keys_states = set_mode ;
+    003B6 E081      LDI	R24,1
+    003B7 9380 0076 STS	keys_states,R24
+(0058) 						Get_time();
+    003B9 DD10      RCALL	_Get_time
+(0059) 					}
+    003BA C00D      RJMP	0x03C8
+(0060) 					else if (++set_states >= 3)
+    003BB 9140 0077 LDS	R20,set_states
+    003BD 5F4F      SUBI	R20,0xFF
+    003BE 9340 0077 STS	set_states,R20
+    003C0 3043      CPI	R20,3
+    003C1 F030      BCS	0x03C8
+(0061) 					{
+(0062) 						keys_states = set_states = normal_mode ;
+    003C2 2422      CLR	R2
+    003C3 9220 0077 STS	set_states,R2
+    003C5 9220 0076 STS	keys_states,R2
+(0063) 						Set_time();
+    003C7 DDD8      RCALL	_Set_time
+(0064) 					}
+(0065) 				 }
+(0066) 				 break;
+(0067) 			}
+(0068) 			if(keys_states== set_mode )
+    003C8 9180 0076 LDS	R24,keys_states
+    003CA 3081      CPI	R24,1
+    003CB F4E9      BNE	0x03E9
+(0069) 			{
+(0070) 			switch (read_key_n(6))
+    003CC E006      LDI	R16,6
+    003CD DEB9      RCALL	_read_key_n
+    003CE 2EA0      MOV	R10,R16
+    003CF 2D4A      MOV	R20,R10
+    003D0 2755      CLR	R21
+    003D1 3041      CPI	R20,1
+    003D2 E0E0      LDI	R30,0
+    003D3 075E      CPC	R21,R30
+    003D4 F029      BEQ	0x03DA
+    003D5 3042      CPI	R20,2
+    003D6 E0E0      LDI	R30,0
+    003D7 075E      CPC	R21,R30
+    003D8 F049      BEQ	0x03E2
+    003D9 C00F      RJMP	0x03E9
+(0071) 			{
+(0072) 			case 1:
+(0073) 				 no_action_time=0;
+    003DA 2422      CLR	R2
+    003DB 2433      CLR	R3
+    003DC 9230 007F STS	main.c:no_action_time+1,R3
+    003DE 9220 007E STS	main.c:no_action_time,R2
+(0074) 				 Sub_time();break;
+    003E0 DD31      RCALL	_Sub_time
+    003E1 C007      RJMP	0x03E9
+(0075) 			case 2:
+(0076) 				 no_action_time=0;
+    003E2 2422      CLR	R2
+    003E3 2433      CLR	R3
+    003E4 9230 007F STS	main.c:no_action_time+1,R3
+    003E6 9220 007E STS	main.c:no_action_time,R2
+(0077) 				 quick_Sub_time();break;
+FILE: <library>
+    003E8 DD65      RCALL	_quick_Sub_time
+    003E9 CF6D      RJMP	0x0357
+    003EA 9508      RET
+mod16u:
+    003EB 9468      BSET	6
+    003EC C001      RJMP	xdiv16u
+div16u:
+    003ED 94E8      BCLR	6
+xdiv16u:
+    003EE 92EA      ST	-Y,R14
+    003EF 92FA      ST	-Y,R15
+    003F0 938A      ST	-Y,R24
+    003F1 24EE      CLR	R14
+    003F2 24FF      CLR	R15
+    003F3 E180      LDI	R24,0x10
+    003F4 0F00      LSL	R16
+    003F5 1F11      ROL	R17
+    003F6 1CEE      ROL	R14
+    003F7 1CFF      ROL	R15
+    003F8 16E2      CP	R14,R18
+    003F9 06F3      CPC	R15,R19
+    003FA F018      BCS	0x03FE
+    003FB 1AE2      SUB	R14,R18
+    003FC 0AF3      SBC	R15,R19
+    003FD 9503      INC	R16
+    003FE 958A      DEC	R24
+    003FF F7A1      BNE	0x03F4
+    00400 F416      BRTC	0x0403
+    00401 2D0E      MOV	R16,R14
+    00402 2D1F      MOV	R17,R15
+    00403 9189      LD	R24,Y+
+    00404 90F9      LD	R15,Y+
+    00405 90E9      LD	R14,Y+
+    00406 9508      RET
+mod8u:
+    00407 9468      BSET	6
+    00408 C001      RJMP	xdiv8u
+div8u:
+    00409 94E8      BCLR	6
+xdiv8u:
+    0040A 932A      ST	-Y,R18
+    0040B 92FA      ST	-Y,R15
+    0040C 92EA      ST	-Y,R14
+    0040D 24FF      CLR	R15
+    0040E 24EE      CLR	R14
+    0040F E120      LDI	R18,0x10
+    00410 0F00      LSL	R16
+    00411 1CFF      ROL	R15
+    00412 1CEE      ROL	R14
+    00413 16E1      CP	R14,R17
+    00414 F010      BCS	0x0417
+    00415 1AE1      SUB	R14,R17
+    00416 9503      INC	R16
+    00417 952A      DEC	R18
+    00418 F7B9      BNE	0x0410
+    00419 F40E      BRTC	0x041B
+    0041A 2D0E      MOV	R16,R14
+    0041B 90E9      LD	R14,Y+
+    0041C 90F9      LD	R15,Y+
+    0041D 9129      LD	R18,Y+
+    0041E 9508      RET
+push_xgset300C:
+    0041F 935A      ST	-Y,R21
+    00420 934A      ST	-Y,R20
+    00421 92BA      ST	-Y,R11
+    00422 92AA      ST	-Y,R10
+    00423 9508      RET
+pop_xgset300C:
+    00424 90A9      LD	R10,Y+
+    00425 90B9      LD	R11,Y+
+    00426 9149      LD	R20,Y+
+    00427 9159      LD	R21,Y+
+    00428 9508      RET
+push_xgsetF00C:
+    00429 937A      ST	-Y,R23
+    0042A 936A      ST	-Y,R22
+    0042B 935A      ST	-Y,R21
+    0042C 934A      ST	-Y,R20
+    0042D 92BA      ST	-Y,R11
+    0042E 92AA      ST	-Y,R10
+    0042F 9508      RET
+pop_xgsetF00C:
+    00430 90A9      LD	R10,Y+
+    00431 90B9      LD	R11,Y+
+    00432 9149      LD	R20,Y+
+    00433 9159      LD	R21,Y+
+    00434 9169      LD	R22,Y+
+    00435 9179      LD	R23,Y+
+    00436 9508      RET
+lsl8:
+    00437 2311      TST	R17
+    00438 F019      BEQ	0x043C
+    00439 0F00      LSL	R16
+    0043A 951A      DEC	R17
+    0043B CFFB      RJMP	lsl8
+    0043C 9508      RET
